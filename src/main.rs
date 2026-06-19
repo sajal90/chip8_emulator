@@ -1,34 +1,31 @@
-const MAX_MEMORY : i32 = 1 << 12;
-const WIDTH : i32 = 64;
-const HEIGHT : i32 = 32;
+const MAX_MEMORY : usize = 1 << 12; // 4096 bytes
+const WIDTH : usize = 64;
+const HEIGHT : usize = 32;
 
-/*
- * chip-8 contains 16 8-bit general purpose registers, a 16-bit program counter
- * and a 16-bit index register
+/* Chip8 contains 16 general purpose registers, each of 8 bits, a index register
+ * and a program counter register of 16 bits.
+ * It has a memory of 4096 bytes
  */
-// TODO: refactor R_I and R_PC, as they are 16-bit, unlike other regs
-enum Registers {
-    V0,
-    V1,
-    V2,
-    V3,
-    V4,
-    V5,
-    V6,
-    V7,
-    V8,
-    V9,
-    VA,
-    VB,
-    VC,
-    VD,
-    VE,
-    VF,   // also used as flag register for overflow operations
-    I,
-    PC,
+struct Cpu {
+    v: [u8; 16],
+    i: u16,
+    pc: u16,
+    memory: [u8; MAX_MEMORY],
+}
+
+impl Cpu {
+    fn new() -> Self {
+        Cpu {
+            v: [0; 16],
+            i: 0,
+            pc: 0x200, // Programs starts here
+            memory: [0; MAX_MEMORY],
+        }
+    }
 }
 
 
 fn main() {
-    println!("Hello, world!");
+    let cpu = Cpu::new();
+    println!("Cpu started at {}", cpu.pc);
 }
