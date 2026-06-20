@@ -54,6 +54,17 @@ impl Cpu {
         (fir << 8) | sec
     }
 
+    fn push(&mut self, val: u16) {
+        self.stack[self.sp as usize] = val;
+        self.sp += 1;
+    }
+
+    fn pop(&mut self) -> u16 {
+        self.sp -= 1;
+        self.stack[self.sp as usize]
+    }
+
+
     fn execute(&mut self, op: u16) {
         let digit1 = (op & 0xF000) >> 12;
         let digit2 = (op & 0x0F00) >> 8;
