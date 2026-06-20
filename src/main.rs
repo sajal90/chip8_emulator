@@ -11,15 +11,17 @@ struct Cpu {
     i: u16,
     pc: u16,
     memory: [u8; MAX_MEMORY],
+    display: [bool; WIDTH * HEIGHT],
 }
 
 impl Cpu {
     fn new() -> Self {
-        Cpu {
+        let mut cpu = Cpu {
             v: [0; 16],
             i: 0,
             pc: 0x200, // Programs starts here
             memory: [0; MAX_MEMORY],
+            display: [false; WIDTH * HEIGHT],
         };
         cpu.memory[0..80].copy_from_slice(&FONT);
         cpu
@@ -36,6 +38,25 @@ impl Cpu {
         let sec = self.memory[self.pc as usize + 1] as u16;
         self.pc += 2;
         (fir << 8) | sec
+    }
+
+    fn execute(&mut self, op: u16) {
+        let digit1 = (op & 0xF000) >> 12;
+        let digit2 = (op & 0x0F00) >> 8;
+        let digit3 = (op & 0x00F0) >> 4;
+        let digit4 = op & 0x000F;
+
+        match (digit1, digit2, digit3, digit4) {
+            // NOP
+            (0, 0, 0, 0) => return,
+            // clear screen
+            (0, 0, 0xE, 0) => {
+                self.display = [false; WIDTH * HEIGHT];
+            }
+            (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
+        }
+
+
     }
 }
 
