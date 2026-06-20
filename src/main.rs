@@ -1,17 +1,26 @@
 const MAX_MEMORY : usize = 1 << 12; // 4096 bytes
 const WIDTH : usize = 64;
 const HEIGHT : usize = 32;
+const REG_COUNT : usize = 16;
+const STACK_SIZE : usize = 16;
+const NUM_KEYS: usize = 16;
 
 /* Chip8 contains 16 general purpose registers, each of 8 bits, a index register
  * and a program counter register of 16 bits.
- * It has a memory of 4096 bytes.
+ * It has a memory of 4096 bytes, A small stack, 16 different keys, and two
+ * timers; a dt (delay timer) and a st(sound timer).
  */
 struct Cpu {
-    v: [u8; 16],
+    v: [u8; REG_COUNT],
     i: u16,
     pc: u16,
     memory: [u8; MAX_MEMORY],
     display: [bool; WIDTH * HEIGHT],
+    sp: u16,
+    stack: [u16; STACK_SIZE],
+    keys: [bool; NUM_KEYS],
+    dt: u8,
+    st: u8,
 }
 
 impl Cpu {
@@ -22,6 +31,11 @@ impl Cpu {
             pc: 0x200, // Programs starts here
             memory: [0; MAX_MEMORY],
             display: [false; WIDTH * HEIGHT],
+            sp: 0,
+            stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
+            dt: 0,
+            st: 0,
         };
         cpu.memory[0..80].copy_from_slice(&FONT);
         cpu
