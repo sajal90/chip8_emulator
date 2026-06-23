@@ -1,3 +1,5 @@
+use rand::random;
+
 const MAX_MEMORY : usize = 1 << 12; // 4096 bytes
 const WIDTH : usize = 64;
 const HEIGHT : usize = 32;
@@ -114,7 +116,217 @@ impl Cpu {
             // clear screen
             (0, 0, 0xE, 0) => {
                 self.display = [false; WIDTH * HEIGHT];
-            }
+            },
+            // Return from subroutine
+            (0, 0, 0xE, 0xE) => {
+                let retAddr = self.pop();
+                self.pc = retAddr;
+            },
+            // Jump to NNN
+            (1, _, _, _) => {
+                self.pc = op & 0xFFF;
+            },
+            // Call Subroutine
+            (2, _, _, _) => {
+                self.push(self.pc);
+                self.pc = op & 0xFFF;
+            },
+            // skip if VX(<x> register) == NN
+            (3, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                if self.v[x] == nn {
+                    self.pc += 2;
+                }
+            },
+            // skip if VX != NN
+            (4, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                if self.v[x] != nn {
+                    self.pc += 2;
+                }
+            },
+            // skip if VX == VY. x is digit2, y is digit3
+            (5, _, _, _) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v[x] == self.v[y] {
+                    self.pc += 2;
+                }
+            },
+            // set VX == NN
+            (6, _, _, _) => {
+                let x = digit2 as usize;
+                self.v[x] = (op & 0xFF) as u8;
+            },
+            // set VX += NN
+            (7, _, _, _) => {
+                let x = digit2 as usize;
+                self.v[x] += (op & 0xFF) as u8;
+            },
+            // set VX = VY;
+            (8, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v[x] = self.v[y];
+            },
+            // bitwise OR
+            (8, _, _, 1) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v[x] |= self.v[y];
+            },
+            // bitwise AND
+            (8, _, _, 2) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v[x] &= self.v[y];
+            },
+            // bitwise XOR
+            (8, _, _, 3) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v[x] ^= self.v[y];
+            },
+            // set v[x] += v[y];
+            (8, _, _, 4) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                let (new_vx, carry) = self.v[x].overflowing_add(self.v[y]);
+                let new_vf = if carry { 1 } else { 0 };
+                self.v[x] = new_vx;
+                self.v[0xF] = new_vf;
+            },
+            // set v[x] -= v[y]
+            (8, _, _, 5) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                let (new_vx, borrow) = self.v[x].overflowing_sub(self.v[y]);
+                let new_vf = if borrow { 0 } else { 1 };
+                self.v[x] = new_vx;
+                self.v[0xF] = new_vf;
+            },
+            // single right shift;
+            (8, _, _, 6) => {
+                let x = digit2 as usize;
+                self.v[0xF] = self.v[x] & 1;
+                self.v[x] >>= 1;
+            },
+            // set v[x] = v[y] - v[x]
+            (8, _, _, 7) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                let (diff, borrow) = self.v[y].overflowing_sub(self.v[x]);
+                self.v[0xF] = if borrow { 0 } else { 1 };
+                self.v[x] = diff;
+            },
+            // single left shift
+            (8, _, _, 0xE) => {
+                let x = digit2 as usize;
+                self.v[0xF] = (self.v[x] >> 7) & 1;
+                self.v[x] <<= 1;
+            },
+            // skip if VX != VY
+            (9, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v[x] != self.v[y] {
+                    self.pc += 2;
+                }
+            },
+            // set IR = NNN
+            (0xA, _, _, _) => {
+                self.i = op & 0xFFF;
+            },
+            // jump to v[0] + NNN
+            (0xB, _, _, _) => {
+                self.pc = (self.v[0] as u16) + (op & 0xFFF);
+            },
+            // set v[x] = rand() & NN
+            (0xC, _, _, _) => {
+                let x = digit2 as usize;
+                let r : u8 = random();
+                self.v[x] = r & (op & 0xFF);
+            },
+            // draw sprite
+            (0xD, _, _, _) => {
+                // TODO: implement this
+            },
+            // skip if key in v[x] is pressed
+            (0xE, _, 9, 0xE) => {
+                let x = digit2 as usize;
+                if self.keys[self.v[x] as usize] {
+                    self.pc += 2;
+                }
+            },
+            // skip if key in v[x] isn't pressed
+            (0xE, _, 0xA, 1) => {
+                let x = digit2 as usize;
+                if !self.keys[self.v[x] as usize] {
+                    self.pc += 2;
+                }
+            },
+            // set v[x] to dt
+            (0xF, _, 0, 7) => {
+                let x = digit2 as usize;
+                self.v[x] = self.dt;
+            },
+            // wait for any key press
+            (0xF, _, 0, 0xA) => {
+                let x = digit2 as usize;
+                let mut pressed = false;
+                for i in 0..self.keys.len() {
+                    if self.keys[i] {
+                        self.v[x] = i as u8;
+                        pressed = true;
+                        break;
+                    }
+                }
+                if !pressed {
+                    self.pc -= 2;
+                }
+            },
+            // set dt to v[x]
+            (0xF, _, 1, 5) => {
+                let x = digit2 as usize;
+                self.dt = self.v[x];
+            },
+            // set st to v[x]
+            (0xF, _, 1, 8) => {
+                let x = digit2 as usize;
+                self.st = self.v[x];
+            },
+            // set IR += v[x]
+            (0xF, _, 1, 0xE) => {
+                let x = digit2 as usize;
+                self.i = self.i.wrapping_add(self.v[x] as u16);
+            },
+            // set IR to font addr
+            (0xF, _, 2, 9) => {
+                let x = digit2 as usize;
+                self.i = (self.v[x] as u16) * 5;
+            },
+            // set IR to BCD(binary coded decimal) of v[x]
+            (0xF, _, 3, 3) => {
+                // TODO
+            },
+            // store from v[0] to v[x] into IR
+            (0xF, _, 5, 5) => {
+                let x = digit2 as usize;
+                let i = self.i as usize;
+                for idx in 0..=x {
+                    self.memory[i + idx] = self.v[idx];
+                }
+            },
+            // load IR into v[0] to v[x]
+            (0xF, _, 6, 5) => {
+                let x = digit2 as usize;
+                let i = self.i as usize;
+                for idx in 0..=x {
+                    self.v[idx] = self.memory[i+idx];
+                }
+            },
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
