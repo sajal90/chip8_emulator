@@ -2,6 +2,8 @@ use rand::random;
 use sdl2;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 
 const MAX_MEMORY : usize = 1 << 12; // 4096 bytes
 const WIDTH : usize = 64;
@@ -405,8 +407,26 @@ fn main() {
     let mut canvas = window.into_canvas().build().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
-    loop {
+    'gameloop: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } |
+                    Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'gameloop,
+                    Event::KeyDown { keycode: Some(kc), .. } => {
+                        if let Some(i) = map_key(kc) {
+                            cpu.keys[i] = true;
+                        }
+                    },
+                    Event::KeyUp { keycode: Some(kc), .. } => {
+                        if let Some(i) = map_key(kc) {
+                            cpu.keys[i] = false;
+                        }
+                    },
+                    _ => {}
+            }
+        }
         cpu.tick();
+        cpu.tick_timers();
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
         canvas.set_draw_color(Color::WHITE);
@@ -425,5 +445,6 @@ fn main() {
         }
 
         canvas.present();
+        std::thread::sleep(std::time::Duration::from_micros(2000));
     }
 }
