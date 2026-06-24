@@ -247,7 +247,7 @@ impl Cpu {
             (0xC, _, _, _) => {
                 let x = digit2 as usize;
                 let r : u8 = random();
-                self.v[x] = r & (op & 0xFF);
+                self.v[x] = r & (op as u8 & 0xFF);
             },
             // draw sprite
             (0xD, _, _, _) => {
@@ -309,7 +309,12 @@ impl Cpu {
             },
             // set IR to BCD(binary coded decimal) of v[x]
             (0xF, _, 3, 3) => {
-                // TODO
+                let x = digit2 as usize;
+                let mut decNum = self.v[x];
+                for i in 0..=2 {
+                    self.memory[self.i as usize + 2 - i] = decNum % 10;
+                    decNum = decNum / 10;
+                }
             },
             // store from v[0] to v[x] into IR
             (0xF, _, 5, 5) => {
