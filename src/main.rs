@@ -251,30 +251,30 @@ impl Cpu {
             },
             // draw sprite
             (0xD, _, _, _) => {
-                let x_coord = self.v_reg[digit2 as usize] as u16;
-                let y_coord = self.v_reg[digit3 as usize] as u16;
+                let x_coord = self.v[digit2 as usize] as u16;
+                let y_coord = self.v[digit3 as usize] as u16;
                 let num_rows = digit4;
                 let mut flipped = false;
 
                 for y_line in 0..num_rows {
-                    let addr = self.i_reg + y_line as u16;
-                    let pixels = self.ram[addr as usize];
+                    let addr = self.i + y_line as u16;
+                    let pixels = self.memory[addr as usize];
 
                     for x_line in 0..8 {
                         if (pixels & (0b1000_0000 >> x_line)) != 0 {
                             let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
                             let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
                             let idx = x + SCREEN_WIDTH * y;
-                            flipped |= self.screen[idx];
-                            self.screen[idx] ^= true;
+                            flipped |= self.display[idx];
+                            self.display[idx] ^= true;
                         }
                     }
                 }
 
                 if flipped {
-                    self.v_reg[0xF] = 1;
+                    self.v[0xF] = 1;
                 } else {
-                    self.v_reg[0xF] = 0;
+                    self.v[0xF] = 0;
                 }
             },
             // skip if key in v[x] is pressed
