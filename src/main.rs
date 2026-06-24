@@ -1,8 +1,12 @@
 use rand::random;
+use sdl2;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
 
 const MAX_MEMORY : usize = 1 << 12; // 4096 bytes
 const WIDTH : usize = 64;
 const HEIGHT : usize = 32;
+const SCALE : u32 = 15;
 const REG_COUNT : usize = 16;
 const STACK_SIZE : usize = 16;
 const NUM_KEYS: usize = 16;
@@ -119,8 +123,8 @@ impl Cpu {
             },
             // Return from subroutine
             (0, 0, 0xE, 0xE) => {
-                let retAddr = self.pop();
-                self.pc = retAddr;
+                let ret_addr = self.pop();
+                self.pc = ret_addr;
             },
             // Jump to NNN
             (1, _, _, _) => {
@@ -163,7 +167,7 @@ impl Cpu {
             // set VX += NN
             (7, _, _, _) => {
                 let x = digit2 as usize;
-                self.v[x] += (op & 0xFF) as u8;
+                self.v[x] = self.v[x].wrapping_add((op & 0xFF) as u8);
             },
             // set VX = VY;
             (8, _, _, 0) => {
@@ -262,9 +266,9 @@ impl Cpu {
 
                     for x_line in 0..8 {
                         if (pixels & (0b1000_0000 >> x_line)) != 0 {
-                            let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
-                            let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
-                            let idx = x + SCREEN_WIDTH * y;
+                            let x = (x_coord + x_line) as usize % WIDTH;
+                            let y = (y_coord + y_line) as usize % HEIGHT;
+                            let idx = x + WIDTH * y;
                             flipped |= self.display[idx];
                             self.display[idx] ^= true;
                         }
@@ -334,10 +338,10 @@ impl Cpu {
             // set IR to BCD(binary coded decimal) of v[x]
             (0xF, _, 3, 3) => {
                 let x = digit2 as usize;
-                let mut decNum = self.v[x];
+                let mut dec_num = self.v[x];
                 for i in 0..=2 {
-                    self.memory[self.i as usize + 2 - i] = decNum % 10;
-                    decNum = decNum / 10;
+                    self.memory[self.i as usize + 2 - i] = dec_num % 10;
+                    dec_num = dec_num / 10;
                 }
             },
             // store from v[0] to v[x] into IR
@@ -361,12 +365,65 @@ impl Cpu {
     }
 }
 
+fn map_key(keycode: Keycode) -> Option<usize> {
+    match keycode {
+        Keycode::Num1 => Some(0x1),
+        Keycode::Num2 => Some(0x2),
+        Keycode::Num3 => Some(0x3),
+        Keycode::Num4 => Some(0xC),
+        Keycode::Q    => Some(0x4),
+        Keycode::W    => Some(0x5),
+        Keycode::E    => Some(0x6),
+        Keycode::R    => Some(0xD),
+        Keycode::A    => Some(0x7),
+        Keycode::S    => Some(0x8),
+        Keycode::D    => Some(0x9),
+        Keycode::F    => Some(0xE),
+        Keycode::Z    => Some(0xA),
+        Keycode::X    => Some(0x0),
+        Keycode::C    => Some(0xB),
+        Keycode::V    => Some(0xF),
+        _             => None,
+    }
+}
+
 fn main() {
+    let rom_path = std::env::args().nth(1).expect("please provide a rom path");
+    let rom = std::fs::read(rom_path).expect("failed to read rom");
+
     let mut cpu = Cpu::new();
+    cpu.load_rom(&rom);
 
-    let rom: &[u8] = &[0x00, 0xE0]; // fake rom for test
-    cpu.load_rom(rom);
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
 
-    cpu.tick();
-    println!("Cpu started at {}", cpu.pc);
+    let window = video_subsystem.window("CHIP8", WIDTH as u32 * SCALE, HEIGHT as u32 * SCALE)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    loop {
+        cpu.tick();
+        canvas.set_draw_color(Color::BLACK);
+        canvas.clear();
+        canvas.set_draw_color(Color::WHITE);
+
+        for (i, &pixel) in cpu.display.iter().enumerate() {
+            if pixel {
+                let x = (i % WIDTH) as i32;
+                let y = (i / WIDTH) as i32;
+                canvas.fill_rect(Rect::new(
+                            x * SCALE as i32,
+                            y * SCALE as i32,
+                            SCALE,
+                            SCALE,
+                            )).unwrap();
+            }
+        }
+
+        canvas.present();
+    }
 }
